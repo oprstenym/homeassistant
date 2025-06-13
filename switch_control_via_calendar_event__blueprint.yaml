@@ -1,0 +1,102 @@
+blueprint:
+  name: Ovládání zásuvky podle události v kalendáři
+  description: >
+    Zapne zásuvku na začátku určené události v kalendáři, vypne ji po skončení jen pokud ji zapnula automatizace,
+    nebo přesně na konci události i když byla zapnuta ručně. Pokud byla ručně vypnuta, automatizace znovu nezapíná.
+  domain: automation
+  input:
+    calendar_entity:
+      name: Kalendář
+      selector:
+        entity:
+          domain: calendar
+    switch_entity:
+      name: Zásuvka
+      selector:
+        entity:
+          domain: switch
+    event_title:
+      name: Název události
+      description: Událost v kalendáři, na kterou má zásuvka reagovat (např. "Zalévání")
+      selector:
+        text:
+    flag_auto:
+      name: Indikátor zapnutí automatizací
+      description: input_boolean, který slouží jako příznak že zásuvku zapnula automatizace
+      selector:
+        entity:
+          domain: input_boolean
+    flag_manual_off:
+      name: Indikátor ručního vypnutí během události
+      description: input_boolean, který indikuje, že zásuvka byla během události ručně vypnuta
+      selector:
+        entity:
+          domain: input_boolean
+
+trigger:
+  - platform: state
+    entity_id: !input calendar_entity
+
+condition:
+  - condition: template
+    value_template: "{{ trigger.to_state.attributes.message == (input.event_title | default('')) }}"
+
+action:
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: !input calendar_entity
+            state: 'on'
+          - condition: state
+            entity_id: !input switch_entity
+            state: 'off'
+          - condition: state
+            entity_id: !input flag_manual_off
+            state: 'off'
+        sequence:
+          - service: switch.turn_on
+            target:
+              entity_id: !input switch_entity
+          - service: input_boolean.turn_on
+            target:
+              entity_id: !input flag_auto
+
+      - conditions:
+          - condition: state
+            entity_id: !input calendar_entity
+            state: 'off'
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: !input flag_auto
+                    state: 'on'
+                sequence:
+                  - service: switch.turn_off
+                    target:
+                      entity_id: !input switch_entity
+                  - service: input_boolean.turn_off
+                    target:
+                      entity_id: !input flag_auto
+                  - service: input_boolean.turn_off
+                    target:
+                      entity_id: !input flag_manual_off
+
+              - conditions:
+                  - condition: state
+                    entity_id: !input switch_entity
+                    state: 'on'
+                  - condition: template
+                    value_template: >
+                      {% set end = trigger.from_state.attributes.end_time %}
+                      {% set now = now().isoformat() %}
+                      {{ now[:19] == end[:19] }}
+                sequence:
+                  - service: switch.turn_off
+                    target:
+                      entity_id: !input switch_entity
+                  - service: input_boolean.turn_off
+                    target:
+                      entity_id: !input flag_manual_off
+
+mode: single
