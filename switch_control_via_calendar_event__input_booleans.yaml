@@ -1,0 +1,10 @@
+# In the configuration.yaml, add the following
+# input_boolean: !include input_boolean.yaml
+
+zasuvka_zapnuta_automatizaci:
+  name: Zásuvka zapnuta automatizací
+  icon: mdi:robot
+
+zasuvka_vypnuta_rucne:
+  name: Zásuvka vypnuta ručně během události
+  icon: mdi:hand-back-right
